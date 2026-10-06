@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Google ログイン</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;min-height:100svh;display:grid;place-items:center;padding:24px;background:#f5f7fa;color:#202938;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}main{width:100%;max-width:420px;padding:36px 28px;background:white;border:1px solid #e4e8ef;border-radius:20px;text-align:center;box-shadow:0 12px 40px #26334d08}h1{margin:0 0 12px;font-size:24px}p{line-height:1.7}.muted{color:#657084;font-size:14px}button{width:100%;min-height:48px;border:1px solid #cbd2dc;border-radius:10px;background:white;color:#202938;font:inherit;font-weight:600;padding:12px 16px;cursor:pointer}button:hover{background:#f1f5fa}button:focus-visible{outline:3px solid #4285f4;outline-offset:3px}button:disabled{opacity:.55;cursor:wait}.avatar{width:88px;height:88px;border-radius:50%;object-fit:cover;margin:12px auto;background:#edf2fa}.fallback{display:grid;place-items:center;font-size:32px;color:#4c6485}#name{font-size:20px;overflow-wrap:anywhere;margin:12px 0 4px}#email{overflow-wrap:anywhere;margin:0 0 24px}#error{background:#fff1f0;color:#a32828;border-radius:10px;padding:12px;font-size:14px;overflow-wrap:anywhere;text-align:left;margin-bottom:0}[hidden]{display:none!important}@media(max-width:360px){main{padding:28px 18px}body{padding:16px}}
+</style>
+</head>
+<body>
+<main aria-labelledby="heading">
+<h1 id="heading">ようこそ</h1>
+<p id="status" class="muted" role="status" aria-live="polite">ログイン状態を確認しています…</p>
+<section id="signed-out" hidden>
+<p class="muted">Google アカウントでログインできます。</p>
+<button id="login" type="button" disabled>Google でログイン</button>
+</section>
+<section id="signed-in" aria-label="プロフィール" hidden>
+<img id="photo" class="avatar" alt="プロフィール写真" referrerpolicy="no-referrer" hidden>
+<div id="fallback" class="avatar fallback" aria-label="プロフィール写真なし" hidden></div>
+<h2 id="name"></h2>
+<p id="email" class="muted"></p>
+<button id="logout" type="button" disabled>ログアウト</button>
+</section>
+<p id="error" role="alert" hidden></p>
+<noscript><p>ご利用には JavaScript を有効にしてください。</p></noscript>
+</main>
+<script type="module">
+// Firebase Console で Google プロバイダを有効化し、配信先ドメインを
+// Authentication の「承認済みドメイン」に追加してください。
+// このファイルは HTTPS または localhost の Web サーバーから開いてください。
+const firebaseConfig = {
+  apiKey: "AIzaSyCv4Y21jWPXD1KTO7F8S38Rg9OU46LqUfo",
+  authDomain: "login-test-ae99b.firebaseapp.com",
+  projectId: "login-test-ae99b",
+  storageBucket: "login-test-ae99b.firebasestorage.app",
+  messagingSenderId: "575986518621",
+  appId: "1:575986518621:web:e6355c0f57a3a21fcf5bb4"
+};
+const $ = id => document.getElementById(id);
+let busy = false;
+let ready = false;
+function controls() {
+  $('login').disabled = busy || !ready;
+  $('logout').disabled = busy || !ready;
+}
+function clearError() { $('error').hidden = true; $('error').textContent = ''; }
+function showError(error) {
+  const messages = {
+    'auth/popup-closed-by-user': 'ログイン画面が閉じられました。もう一度お試しください。',
+    'auth/popup-blocked': 'ポップアップを許可して、もう一度お試しください。',
+    'auth/cancelled-popup-request': 'ログイン操作が重複しました。もう一度お試しください。',
+    'auth/unauthorized-domain': 'このドメインは未承認です。Firebase の承認済みドメインに追加してください。',
+    'auth/operation-not-allowed': 'Firebase で Google ログインを有効にしてください。',
+    'auth/network-request-failed': '通信に失敗しました。ネット接続を確認してください。',
+    'auth/web-storage-unsupported': 'ログイン状態を保存できません。ブラウザーの保存設定を確認してください。',
+    'auth/account-exists-with-different-credential': 'このメールアドレスは別のログイン方法で登録されています。',
+    'auth/too-many-requests': '操作が多すぎます。少し待ってからお試しください。',
+    'auth/user-disabled': 'このアカウントは無効になっています。',
+    'local-file': 'ファイルを直接開くとログインできません。HTTPS または localhost で開いてください。'
+  };
+  $('error').textContent = messages[error.code] || `エラー: ${String(error.code || error.message || '読み込みに失敗しました。再読み込みしてください。').slice(0, 180)}`;
+  $('error').hidden = false;
+}
+function render(user) {
+  $('signed-out').hidden = !!user;
+  $('signed-in').hidden = !user;
+  $('status').textContent = user ? 'ログインしています' : 'ログインしていません';
+  $('photo').hidden = true;
+  $('photo').removeAttribute('src');
+  $('fallback').hidden = true;
+  $('name').textContent = user ? (user.displayName || 'ユーザー') : '';
+  $('email').textContent = user ? (user.email || 'メールアドレスなし') : '';
+  $('fallback').textContent = user ? Array.from(user.displayName || 'G')[0] : '';
+  if (user) {
+    $('fallback').hidden = false;
+    if (user.photoURL) {
+      $('photo').onload = () => { $('photo').hidden = false; $('fallback').hidden = true; };
+      $('photo').onerror = () => { $('photo').hidden = true; $('fallback').hidden = false; };
+      $('photo').src = user.photoURL;
+    }
+  }
+}
+try {
+  if (location.protocol === 'file:') throw { code: 'local-file' };
+  // 動的 import によりライブラリの読み込み失敗も画面に表示します。
+  const [{ initializeApp }, { getAuth, GoogleAuthProvider, signInWithPopup, signOut,
+    onAuthStateChanged, setPersistence, browserLocalPersistence }] = await Promise.all([
+    import('https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js'),
+    import('https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js')
+  ]);
+  const auth = getAuth(initializeApp(firebaseConfig));
+  auth.languageCode = 'ja';
+  const provider = new GoogleAuthProvider();
+  await setPersistence(auth, browserLocalPersistence);
+  onAuthStateChanged(auth, user => {
+    render(user);
+    ready = true;
+    controls();
+  }, error => {
+    ready = false;
+    controls();
+    $('status').textContent = 'ログイン状態を確認できませんでした';
+    showError(error);
+  });
+  async function run(action, message) {
+    if (busy || !ready) return;
+    clearError();
+    busy = true;
+    controls();
+    $('status').textContent = message;
+    try { await action(); }
+    catch (error) { showError(error); }
+    finally { busy = false; render(auth.currentUser); controls(); }
+  }
+  // クリックから直接ポップアップを開き、ブロックされにくくします。
+  $('login').addEventListener('click', () => run(() => signInWithPopup(auth, provider), 'ログインしています…'));
+  $('logout').addEventListener('click', () => run(() => signOut(auth), 'ログアウトしています…'));
+} catch (error) {
+  $('signed-out').hidden = false;
+  $('status').textContent = 'ログインの準備ができませんでした';
+  showError(error);
+}
+</script>
+</body>
+</html>
